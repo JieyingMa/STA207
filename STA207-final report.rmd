@@ -1,0 +1,1226 @@
+---
+title: "Investigation on Grade 1 Math Scores of Different Class Types"
+author: "Jieying Ma"
+date: "2024.3.18"
+output:
+  html_document:
+    df_print: paged
+    number_sections: yes
+    toc: true
+    toc_depth : 4
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.pos = 'H')
+```
+
+# Abstract {.unnumbered}
+
+<p align="justify">In this study, we explored whether class mean math scores of grade 1 are related to class type. We use a two-way ANOVA model on the data set from the Student/Teacher Achievement Ratio (STAR) program, and find that class types do effect students math scores in grade 1 and the small classes have the
+highest mean math score among the three class types. However, there are some missing value in individual math score and class type of schools, and the class types are not entirely follow the designed class size. Therefore we do sensitive test on them and also on adding more variables, the test results show that the conclusion is not affected by these caveats. </p>
+
+<p align="justify">
+
+
+# Introduction
+
+<p align="justify">How class size can affect the quality of teaching and the performance of students is always a hot topic in education. Schools can rationalize class sizes to achieve the best teaching and learning outcomes. Many researches based on the STAR experiment show that small classes have both the short-term impacts (e.g., test score improvement, grade retention reduction) and long-term impacts (e.g., higher graduation rate from high school, lager participation in college entrance exam) on students.[1] In this study, we focus on whether class types effect students math scores in grade 1. And if there is an effect, which class types is related to the highest grade 1 math scores.</p>
+
+
+# Background
+
+## Study planning, design and implementation
+
+<p align="justify">The Student/Teacher Achievement Ratio (STAR) was a four years class-size study of students from kindergarten through third grade in Tennessee. The study wanted to examine (1) the impact of smaller class sizes on students' achievement and development, (2) whether the impact of smaller class sizes on students was cumulative (3) whether there was an impact of teacher training and inclusion in aides.</p>
+
+<p align="justify">Students were randomly placed into one of three class types: small class with 13 to 17 students, regular class with 22 to 25 students, or regular-with-aide class with a teacher's aide that also had 22 to 25 students. Once students were placed in a certain class type, they would remain in that class type for later years. One special case was that students who were assigned to regular class and regular-with-aide in kindergarten were re-assigned randomly to these two class types in grade 1, so there would be a portion of students who changed class types in grade 1. During the four-year experiment, students who transferred to STAR schools from non-STAR schools were randomly placed into one of the class types. However, this random assignment was subject to the condition that the number of students in small classes could not surpass 17. The randomization of placing students into different class types was conducted, which showed that there were no systematic bias in gender, race, and free-lunch composition. Also, teachers were randomly assigned to classes.[2]</p>
+
+## Dataset
+
+<p align="justify">The whole dataset contains 379 variables of 11,601 students from 79 schools who participated in this program of for at least one year in grade k-3. As we are only interested in the grade 1 math scores, we will mostly focus on the personal data and grade k-3 data.</p>
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(haven)
+dataset = read_sav('dataverse_files/STAR_Students.sav')
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+classtype_table_stu = sapply(dataset[, c("gkclasstype", "g1classtype", "g2classtype", "g3classtype")], table)
+
+library(dplyr)
+gkclasstype_summary = dataset[!is.na(dataset$gkclasstype),] %>%
+   group_by(gktchid) %>%
+   summarise(gkclasstype = first(gkclasstype))
+
+g1classtype_summary = dataset[!is.na(dataset$g1classtype),] %>%
+   group_by(g1tchid) %>%
+   summarise(g1classtype = first(g1classtype))
+
+g2classtype_summary = dataset[!is.na(dataset$g2classtype),] %>%
+   group_by(g2tchid) %>%
+   summarise(g2classtype = first(g2classtype))
+
+g3classtype_summary = dataset[!is.na(dataset$g3classtype),] %>%
+   group_by(g3tchid) %>%
+   summarise(g3classtype = first(g3classtype))
+
+classtype_table_cla = cbind(table(gkclasstype_summary$gkclasstype),table(g1classtype_summary$g1classtype),
+                            table(g2classtype_summary$g2classtype),table(g3classtype_summary$g3classtype))
+```
+
+```{r echo=FALSE, fig.height=5, fig.width=11}
+par(mfrow=c(1,2))
+# Create a bar plot
+barplot(classtype_table_stu,beside = T, main = "Number of Students by Class Type",
+        xlab = "Grade", ylab = "Number of Students", ylim = c(0,4000), space = c(0.2,1),
+        names.arg = c('Kindergarden', 'Grade 1', 'Grade 2', 'Grade 3'),
+        legend.text = c('Small','Regular','Regular-with-aide'), args.legend = list(x='top',xpd=T,ncol=2))
+# Add labels on top of each bar
+text(x = c(1,2.2,3.4, 5.4,6.6,7.8, 9.8,11,12.2, 14.2,15.4,16.6)+0.5,
+     y = classtype_table_stu, labels = classtype_table_stu, pos = 3, cex = 0.7)
+
+barplot(classtype_table_cla,beside = T, main = "Number of Classes by Class Type",
+        xlab = "Grade", ylab = "Number of Classes", ylim = c(0,200), space = c(0.2,1),
+        names.arg = c('Kindergarden', 'Grade 1', 'Grade 2', 'Grade 3'),
+        legend.text = c('Small','Regular','Regular-with-aide'), args.legend = list(x='top',xpd=T,ncol=2))
+# Add labels on top of each bar
+text(x = c(1,2.2,3.4, 5.4,6.6,7.8, 9.8,11,12.2, 14.2,15.4,16.6)+0.5,
+     y = classtype_table_cla, labels = classtype_table_cla, pos = 3, cex = 0.9)
+```
+
+<p align="justify">The chart above shows the number of students and the number of classes in each class type from kindergarten through third grade. For personal data, students' id, gender, races, birth-dates are given. In the grade k-3 data, school and class identifiers, class information (e.g., class type, class size), student information (e.g., free/reduced lunch status, test scores, self-development scores), school information (e.g., school urbanicity), and teacher information (e.g., id, gender, race, highest degree, career ladder level, years of total teaching experience) of each grade are given.[2]</p>
+
+<p align="justify">Some existing research on this dataset has shown that the class type effects are more significant on student who aren't white and need free lunch.</p>
+
+
+# Descriptive analysis
+
+## Uni-variate descriptive statistics
+
+### Data distribution
+
+<p align="justify">There are 6829 out of 11601 students that participated in the STAR in their grade 1. These students were from 52 different school and were assigned to 339 classes. As we are interested in the relationship between grade 1 class types and math scores, we summary the relevant variables: students' gender, race, grade 1 class types (g1classtype), class size (g1classsize), math scores (g1tmathss), and free/reduced lunch status (g1freelunch), teachers' gender (g1tgen), race (g1trace), highest degree (g1thighdegree), career ladder level (g1tcareer), and years of total teaching experience (g1tyears), and school urbanicity (g1surban).</p>
+
+<p>
+
+</p>
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+## number of classes and schools
+
+grade1 = dataset[,c(1:3,27,55:80)]
+star_grade1 = grade1[!is.na(grade1$g1classtype),]
+num_class = length(unique(star_grade1$g1tchid))
+num_school = length(unique(table(star_grade1$g1schid)))
+```
+
+```{r echo=FALSE}
+## summary numercial data
+
+Min = round(c(min(star_grade1$g1tmathss,na.rm=TRUE),min(star_grade1$g1classsize,na.rm=TRUE),
+              min(star_grade1$g1tyears,na.rm=TRUE)), 0)
+Q1 = round(c(quantile(star_grade1$g1tmathss,0.25,na.rm=TRUE),
+             quantile(star_grade1$g1classsize,0.25,na.rm=TRUE),
+             quantile(star_grade1$g1tyears,0.25,na.rm=TRUE)), 0)
+Median = round(c(median(star_grade1$g1tmathss,na.rm=TRUE),median(star_grade1$g1classsize,na.rm=TRUE),
+                 median(star_grade1$g1tyears,na.rm=TRUE)), 0)
+Mean = round(c(mean(star_grade1$g1tmathss,na.rm=TRUE),mean(star_grade1$g1classsize,na.rm=TRUE),
+               mean(star_grade1$g1tyears,na.rm=TRUE)), 2)
+Q3 = round(c(quantile(star_grade1$g1tmathss,0.75,na.rm=TRUE),
+             quantile(star_grade1$g1classsize,0.75,na.rm=TRUE),
+             quantile(star_grade1$g1tyears,0.75,na.rm=TRUE)), 0)
+Max = round(c(max(star_grade1$g1tmathss,na.rm=TRUE),max(star_grade1$g1classsize,na.rm=TRUE),
+              max(star_grade1$g1tyears,na.rm=TRUE)), 0)
+NAs = round(colSums(is.na(star_grade1[c('g1tmathss','g1classsize','g1tyears')])),0)
+  
+summary_table = rbind(Min,Q1,Median,Mean,Q3,Max,NAs)
+
+summary_df = data.frame(summary_table, stringsAsFactors = FALSE)
+colnames(summary_df) <- c("Students' Math Scores", 'Class Size',"Teachers' Years of Total Teaching")  
+rownames(summary_df) <- c('Min', '1st Qu.', 'Median', 'Mean', '3rd Qu.', 'Max', 'NAs')  
+
+summary_df
+```
+
+<p>
+
+</p>
+
+```{r echo=FALSE, fig.height=2.5, fig.width=9, fig.align='center'}
+## histogram of numerical data
+
+par(mfrow = c(1,3))
+
+hist(star_grade1$g1tmathss, main = "Student's Math Score Distribution\n of Grade 1", xlab = "Math Score", ylab = "Frequency", breaks = seq(400, 680, by = 10),xlim=c(400,700))
+
+hist(star_grade1$g1classsize, main = "Class Size Distribution\n of Grade 1", xlab = "Class Size", ylab = "Frequency", breaks = seq(10, 30, by = 1), xlim=c(10,30))
+
+hist(star_grade1$g1tyears, main = "Teachers' Years of Total Teaching\nDistributionof Grade 1", xlab = "Years of Total Teaching", ylab = "Frequency", breaks = seq(0, 45, by = 1), xlim=c(0,50))
+
+```
+
+<p align="justify">Students have an average grade 1 math score of 530.53, a median class size of 22, and a mean teacher's years of total teaching of 11.75. There are 231 missing values in math score and 19 in years of total teaching. And the math scores are roughly normally distributed.</p>
+
+<p>
+
+</p>
+
+```{r echo=FALSE, fig.height=9, fig.width=9, fig.align='center'}
+## pie charts of factors
+
+par(mfrow=c(3,3))
+
+# gender
+all_gender_counts = table(star_grade1$gender)
+all_gender_counts["Unknown"] = sum(is.na(star_grade1$gender))
+
+pie(all_gender_counts, 
+     labels = paste(c('Male','Female','NA'), ": ",
+                    round(100 * all_gender_counts / sum(all_gender_counts), 2),
+                    "%", sep=""),
+     main = "Gender Distribution of Students",
+     cex.main = 1.2, cex = 1, radius = 0.8 )
+
+# race
+all_srace_counts = table(star_grade1$race)
+all_srace_counts["Others"] = sum(table(star_grade1$race)[3:6])
+
+pie(all_srace_counts[c(1,2,7)], 
+     labels = paste(c('White','Black','Other'), ": ",
+                    round(100 * all_srace_counts[c(1,2,7)] / sum(table(star_grade1$race)), 2),
+                    "%", sep=""),
+     main = "Race Distribution of Students",
+     cex.main = 1.2, cex = 1, radius = 0.8 )
+
+# g1classtype
+pie(table(star_grade1$g1classtype), 
+     labels = paste(c('Small','Regular','Regular+Aide'), ": ",
+                    round(100 * table(star_grade1$g1classtype) / sum(table(star_grade1$g1classtype)), 2),
+                    "%", sep=""),
+     main = "Class Type Distribution of Students",
+     cex.main = 1.2, cex = 0.9, radius = 0.8 )
+
+# g1freelunch
+pie(table(star_grade1$g1freelunch), 
+     labels = paste(c('Free','Non-free'), ": ",
+                    round(100 * table(star_grade1$g1freelunch) / sum(table(star_grade1$g1freelunch)), 2),
+                    "%", sep=""),
+     main = "Free Lunch Distribution of Students",
+     cex.main = 1.2, cex = 1, radius = 0.8 )
+
+# g1surban
+pie(table(star_grade1$g1surban), 
+     labels = paste(c('Inner city','Suburban','Rural','Urban'), ": ",
+                    round(100 * table(star_grade1$g1surban) / sum(table(star_grade1$g1surban)), 2),
+                    "%", sep=""),
+     main = "School Urbanicity Distribution of Students",
+     cex.main = 1.2, cex = 1, radius = 0.8 )
+
+# g1tgen
+pie(table(star_grade1$g1tgen), 
+     labels = paste(c('Male','Female'), ": ",
+                    round(100 * table(star_grade1$g1tgen) / sum(table(star_grade1$g1tgen)), 2),
+                    "%", sep=""),
+     main = "Gender Distribution of Teachers",
+     cex.main = 1.2, cex = 1, radius = 0.8 )
+
+# g1trace
+pie(table(star_grade1$g1trace)[c(1,2)], 
+     labels = paste(c('White','Black'), ": ",
+                    round(100 * table(star_grade1$g1trace) / sum(table(star_grade1$g1trace)), 2),
+                    "%", sep=""),
+     main = "Race Distribution of Teachers",
+     cex.main = 1.2, cex = 1, radius = 0.8 )
+
+# g1thighdegree
+all_thd_counts = table(star_grade1$g1thighdegree)
+all_thd_counts["Others"] = sum(all_thd_counts[3:4])
+
+pie(all_thd_counts[c(1,2,5)], 
+     labels = paste(c('Bachelors','Master','Other'), ": ",
+                    round(100 * all_thd_counts[c(1,2,5)] / sum(all_thd_counts[c(1,2,5)]), 2),
+                    "%", sep=""),
+     main = "Highest Degree Distribution of Teachers",
+     cex.main = 1.2, cex = 1, radius = 0.8 )
+
+
+# g1tcareer
+pie(table(star_grade1$g1tcareer), 
+     labels = paste(c('No ladder','Apprentice','Probation','Level 1','Level 2','Level 3','Pending'), ": ",
+                    round(100 * table(star_grade1$g1tcareer) / sum(table(star_grade1$g1tcareer)), 2),
+                    "%", sep=""),
+     main = "Career Distribution of Teachers",
+     cex.main = 1.2, cex = 0.85, radius = 0.8 )
+
+```
+
+<p align="justify">The ratio of male to female students is roughly 1:1. The majority of students are white (66.59%) or black (32.66%). Small classes have the fewest total students (28.19%), regular-with-aide the next (33.97%), and regular the most (37.84%). The ratio of having free lunch to having non-free lunch students is roughly 1:1. Most of the students go to school in rural area (47.4%). Nearly all the students have a female teacher (99.57%). About four-fifths of the students had white teachers, and the rest had black teachers. About two-thirds of the students' teachers had a bachelor's degree as their highest level of education, and about one-third of the students' teachers had a master's degree. Most of the students have a teacher in ladder level 1 (66.19%) in grade 1.</p>
+
+<p>
+
+</p>
+
+### Missing data in student level
+
+<p align="justify">Missing not at random (MNAR) means that the missing data are related to other values in the dataset or to the missing values themselves. MNAR can introduce serious bias in statistical analysis and models because missing data are related to their intrinsic properties, and direct exclusion or simple methods to fill in these missing values can lead to erroneous inferences and conclusions. So we check the randomization by showing the the distribution of other variables in missing math score dataset and comparing the distribution of these variables between datasets with and without missing values.</p>
+
+<p>
+</p>
+
+```{r echo=FALSE}
+have_math_grade1 = star_grade1[!is.na(star_grade1$g1tmathss),]
+no_math_grade1 = star_grade1[is.na(star_grade1$g1tmathss),]
+havemath_gender_counts <- table(star_grade1[!is.na(star_grade1$g1tmathss),]$gender)
+havemath_gender_counts["Unknown"] <- sum(is.na(star_grade1[!is.na(star_grade1$g1tmathss),]$gender))
+nomath_gender_counts <- table(star_grade1[is.na(star_grade1$g1tmathss),]$gender)
+nomath_gender_counts["Unknown"] <- sum(is.na(star_grade1[is.na(star_grade1$g1tmathss),]$gender))
+```
+
+
+```{r echo=FALSE, fig.height=12, fig.width=12, fig.align='center'}
+par(mfrow=c(3,3))
+
+pie(table(star_grade1$g1classtype), 
+     labels = paste(c('Small','Regular','Regular+Aide'), ": ",
+                    round(100 * table(star_grade1$g1classtype) / sum(table(star_grade1$g1classtype)), 2),
+                    "%", sep=""),
+     main = "Class Type Distribution of All Students",
+     cex.main = 1.5, cex = 1.3, radius = 0.8 )
+ 
+pie(table(star_grade1[!is.na(star_grade1$g1tmathss),]$g1classtype), 
+     labels = paste(c('Small','Regular','Regular+Aide'), ": ",
+                    round(100 * table(star_grade1[!is.na(star_grade1$g1tmathss),]$g1classtype)
+                          / sum(table(star_grade1[!is.na(star_grade1$g1tmathss),]$g1classtype)), 2),
+                    "%", sep=""),
+     main = "Class Type Distribution of Students\nwith Math Score",
+     cex.main = 1.5, cex = 1.3, radius = 0.8 )
+ 
+pie(table(star_grade1[is.na(star_grade1$g1tmathss),]$g1classtype), 
+    labels = paste(c('Small','Regular','Regular+Aide'), ": ",
+                    round(100 * table(star_grade1[is.na(star_grade1$g1tmathss),]$g1classtype)
+                          / sum(table(star_grade1[is.na(star_grade1$g1tmathss),]$g1classtype)), 2),"%", sep=""),
+     main = "Class Type Distribution of Students\nwithout Math Score",
+     cex.main = 1.5, cex = 1.3, radius = 0.8 )
+
+pie(all_gender_counts, 
+     labels = paste(c('Male','Female','NA'), ": ",
+                    round(100 * all_gender_counts / sum(all_gender_counts), 2),
+                    "%", sep=""),
+     main = "Gender Distribution of All Students",
+     cex.main = 1.5, cex = 1.3, radius = 0.8 )
+ 
+ pie(havemath_gender_counts, 
+     labels = paste(c('Male','Female','NA'), ": ",
+                    round(100 * havemath_gender_counts / sum(havemath_gender_counts), 2),
+                    "%", sep=""),
+     main = "Gender Distribution of Students\nwith Math Score",
+     cex.main = 1.5, cex = 1.3, radius = 0.8 )
+ 
+ pie(nomath_gender_counts, 
+     labels = paste(c('Male','Female','NA'), ": ",
+                    round(100 * nomath_gender_counts / sum(nomath_gender_counts), 2),
+                    "%", sep=""),
+     main = "Gender Distribution of Students\nwithout Math Score",
+     cex.main = 1.5, cex = 1.4, radius = 0.8 )
+ 
+ pie(table(star_grade1$g1surban), 
+     labels = paste(c('Inner City', 'Suburban', 'Rural', 'Urban'), ": ",
+                    round(100 * table(star_grade1$g1classtype) / sum(table(star_grade1$g1classtype)), 2),
+                    "%", sep=""),
+     main = "School Districts Distribution of All Students",
+     cex.main = 1.5, cex = 1.2, radius = 0.7 )
+ 
+pie(table(star_grade1[!is.na(star_grade1$g1tmathss),]$g1surban), 
+     labels = paste(c('Inner City', 'Suburban', 'Rural', 'Urban'), ": ",
+                    round(100 * table(star_grade1[!is.na(star_grade1$g1tmathss),]$g1classtype)
+                          / sum(table(star_grade1[!is.na(star_grade1$g1tmathss),]$g1classtype)), 2),
+                    "%", sep=""),
+     main = "School Districts Distribution of Students\nwithout Math Score",
+     cex.main = 1.5, cex = 1.2, radius = 0.7 )
+ 
+pie(table(star_grade1[is.na(star_grade1$g1tmathss),]$g1surban), 
+    labels = paste(c('Inner City', 'Suburban', 'Rural', 'Urban'), ": ",
+                    round(100 * table(star_grade1[is.na(star_grade1$g1tmathss),]$g1classtype)
+                          / sum(table(star_grade1[is.na(star_grade1$g1tmathss),]$g1classtype)), 2),"%", sep=""),
+     main = "School Districts Distribution of Students\nwithout Math Score",
+     cex.main = 1.5, cex = 1.2, radius = 0.7 )
+```
+
+```{r echo=FALSE}
+havemath_srace_counts = table(have_math_grade1$race)
+havemath_srace_counts["Others"] = sum(table(have_math_grade1$race)[3:6])
+nomath_srace_counts = table(no_math_grade1$race)
+nomath_srace_counts["Others"] = sum(table(no_math_grade1$race)[3:4])
+```
+
+
+
+```{r echo=FALSE, fig.height=4, fig.width=12, fig.align='center'}
+par(mfrow=c(1,3))
+# race
+
+pie(all_srace_counts[c(1,2,7)], 
+     labels = paste(c('White','Black','Other'), ": ",
+                    round(100 * all_srace_counts[c(1,2,7)] / sum(table(star_grade1$race)), 2),
+                    "%", sep=""),
+     main = "Race Distribution of All Students",
+     cex.main = 1.5, cex = 1.15, radius = 0.8 )
+
+pie(havemath_srace_counts[c(1,2,7)], 
+     labels = paste(c('White','Black','Other'), ": ",
+                    round(100 * havemath_srace_counts[c(1,2,7)] / sum(table(have_math_grade1$race)), 2),
+                    "%", sep=""),
+     main = "Race Distribution of Students\nwith Math Score",
+     cex.main = 1.5, cex = 1.15, radius = 0.8 )
+
+pie(nomath_srace_counts[c(1,2,5)], 
+     labels = paste(c('White','Black','Other'), ": ",
+                    round(100 * nomath_srace_counts[c(1,2,5)] / sum(table(no_math_grade1$race)), 2),
+                    "%", sep=""),
+     main = "Race Distribution of Students\nwithout Math Score",
+     cex.main = 1.5, cex = 1.15, radius = 0.8 )
+
+```
+
+
+<p align="justify">There seems not much difference between the distribution of class type, gender, school urbanicity, and race with and without missing math score data. But as the regular class had the most students, the regular-with-aide class had the most missing math score data. The missing math score data contains all the missing gender data. And the ratio of other races increase among the students with missing score value. Therefore, we need more steps to see whether the missing is random.</p>
+
+<p align="justify">Chi-squared test is a statistical method used to test whether there is an association between categorical variables. Since math scores can be categorized as missing and non-missing, we used chi-square tests to examine the relationship between missing math scores and the three factors of gender,  class type, and school urbanicity. Since the sample size of Hispanic with math scores is less than 5, we use the Fisher test to detect the relationship between missing values and race.</p>
+
+<p align="justify">Let's set the significant level as 0.05. The test hypothesis are showed below.  
+H0: There is no association or independence between the two categorical variables, which means the difference between the observed and expected frequencies between the groups is not significant.  
+H1: There is an association or non-independence between the two categorical variables, which means the difference between the observed and expected frequencies between the groups is significant.</p>
+
+
+```{r echo=FALSE}
+library(stats)
+```
+
+
+```{r echo=FALSE}
+gender_chisq_test_result <- chisq.test(table(is.na(star_grade1$g1tmathss), star_grade1$gender))
+classtype_chisq_test_result <- chisq.test(table(is.na(star_grade1$g1tmathss), star_grade1$g1classtype))
+schurban_chisq_test_result <- chisq.test(table(is.na(star_grade1$g1tmathss), star_grade1$g1surban))
+```
+
+```{r echo=FALSE}
+fisher_result <- fisher.test(table(is.na(star_grade1$g1tmathss), star_grade1$race))
+```
+
+
+```{r echo=FALSE}
+chisq_test_result = data.frame(
+  Variables = c('Gender','Race','Class type','School urbanicity'),
+  Categories = c(length(unique(star_grade1$gender)),length(unique(star_grade1$race)),length(unique(star_grade1$g1classtype)),length(unique(star_grade1$g1surban))),
+  Test = c('Chi-squared','Fisher','Chi-squared','Chi-squared'),
+  p_value = sprintf("%.2e", c(gender_chisq_test_result$p.value,fisher_result$p.value,classtype_chisq_test_result$p.value,schurban_chisq_test_result$p.value)),
+  Result = ifelse(c(gender_chisq_test_result$p.value,fisher_result$p.value,classtype_chisq_test_result$p.value,schurban_chisq_test_result$p.value) > 0.05, 'H0', 'H1')
+)
+chisq_test_result
+```
+
+<p align="justify">The test results show that the missing values have an association with race and class type. So we should impute the missing score value with the median math score to reduce bias.</p>
+
+
+```{r echo=FALSE}
+imputed_grade1 = star_grade1
+imputed_grade1$g1tmathss = ifelse(is.na(imputed_grade1$g1tmathss),
+                                  median(imputed_grade1$g1tmathss, na.rm = TRUE),
+                                  imputed_grade1$g1tmathss)
+```
+
+## Data aggregation
+
+<p align="justify">As we investigate the data in class level, we need to aggregate the relevant variables by teacher id. From the summary table of math score, we can see that the mean and median are similar, so we can aggregate individual math scores to the mean class math score.</p>
+
+<p>
+
+</p>
+
+Let's check the effect of aggregating data.  
+
+```{r echo=FALSE,include=FALSE}
+## Aggregate data into teacher ID level
+library(dplyr)
+class_summary = imputed_grade1 %>%
+   group_by(g1tchid) %>%
+   summarise(
+     math_avg = mean(g1tmathss, na.rm = TRUE),
+     g1classsize = first(g1classsize),
+     g1classtype = first(g1classtype),
+     g1surban = first(g1surban),
+     g1schid = first(g1schid),
+     g1trace = first(g1trace),
+     g1thighdegree = first(g1thighdegree),
+     g1tcareer = first(g1tcareer),
+     g1tyears = first(g1tyears),
+     freelunch_ratio = ifelse('1' %in% names(table(g1freelunch)), table(g1freelunch)['1'],
+                              0) / sum(table(g1freelunch)),
+     gender_ratio = table(gender)['1']/sum(table(gender)),
+     white_ratio = ifelse('1' %in% names(table(race)), table(race)['1'], 0) / sum(table(race)),
+   )
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library('cowplot')
+```
+
+
+```{r echo=FALSE, fig.align='center', fig.height=6, fig.width=15, warning=FALSE}
+p1 = ggplot(have_math_grade1[have_math_grade1$g1classtype==1,], aes(x = g1tmathss)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = median(have_math_grade1[have_math_grade1$g1classtype==1,]$g1tmathss), linetype = "dashed", color = "blue", aes(color = "Median")) +
+  geom_vline(xintercept = mean(have_math_grade1[have_math_grade1$g1classtype==1,]$g1tmathss), linetype = "dashed", color = "red", aes(color = "Mean")) +
+  labs(title = "Density Plot at Student Level - Small",
+       x = "Math Score",
+       y = "Density") +
+  theme_minimal()+
+  xlim(c(400,680))
+
+p2 = ggplot(have_math_grade1[have_math_grade1$g1classtype==2,], aes(x = g1tmathss)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = median(have_math_grade1[have_math_grade1$g1classtype==2,]$g1tmathss), linetype = "dashed", color = "blue", aes(color = "Median")) +
+  geom_vline(xintercept = mean(have_math_grade1[have_math_grade1$g1classtype==2,]$g1tmathss), linetype = "dashed", color = "red", aes(color = "Mean")) +
+  labs(title = "Density Plot at Student Level - Regular",
+       x = "Math Score",
+       y = "Density") +
+  theme_minimal()+
+  xlim(c(400,680))
+
+p3 = ggplot(have_math_grade1[have_math_grade1$g1classtype==3,], aes(x = g1tmathss)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = median(have_math_grade1[have_math_grade1$g1classtype==3,]$g1tmathss), linetype = "dashed", color = "blue", aes(color = "Median")) +
+  geom_vline(xintercept = mean(have_math_grade1[have_math_grade1$g1classtype==3,]$g1tmathss), linetype = "dashed", color = "red", aes(color = "Mean")) +
+  labs(title = "Density Plot at Student Level - Regular with Aide",
+       x = "Math Score",
+       y = "Density") +
+  theme_minimal()+
+  xlim(c(400,680))
+
+p4 = ggplot(class_summary[class_summary$g1classtype==1,], aes(x = math_avg)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = median(class_summary[class_summary$g1classtype==1,]$math_avg), linetype = "dashed", color = "blue", aes(color = "Median")) +
+  geom_vline(xintercept = mean(class_summary[class_summary$g1classtype==1,]$math_avg), linetype = "dashed", color = "red", aes(color = "Mean")) +
+  labs(title = "Density Plot at Class Level - Small",
+       x = "Mean Math Score",
+       y = "Density") +
+  theme_minimal()+
+  xlim(c(400,680))
+
+p5 = ggplot(class_summary[class_summary$g1classtype==2,], aes(x = math_avg)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = median(class_summary[class_summary$g1classtype==2,]$math_avg), linetype = "dashed", color = "blue", aes(color = "Median")) +
+  geom_vline(xintercept = mean(class_summary[class_summary$g1classtype==2,]$math_avg), linetype = "dashed", color = "red", aes(color = "Mean")) +
+  labs(title = "Density Plot by at Class Level - Regular",
+       x = "Mean Math Score",
+       y = "Density") +
+  theme_minimal()+
+  xlim(c(400,680))
+
+p6 = ggplot(class_summary[class_summary$g1classtype==3,], aes(x = math_avg)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = median(class_summary[class_summary$g1classtype==3,]$math_avg), linetype = "dashed", color = "blue", aes(color = "Median")) +
+  geom_vline(xintercept = mean(class_summary[class_summary$g1classtype==3,]$math_avg), linetype = "dashed", color = "red", aes(color = "Mean")) +
+  labs(title = "Density Plot by at class level - Regular with Aide",
+       x = "Mean Math Score",
+       y = "Density") +
+  theme_minimal()+
+  xlim(c(400,680))
+
+cowplot::plot_grid(p1,p2,p3,p4,p5,p6,ncol = 3)
+```
+
+<p align="justify">The density plot shows that the class mean math scores have a smaller range of values but smoother distribution shape than the individual math scores. This may be due to the fact that the individual differences and fluctuations in individual math scores are averaged out in the mean score across all classes. The mean and median of classes' scores are about the same as the individuals' ones. The shape of the density plot for the small and regular classes are about the same as the individuals' ones. But the shape of the density plot for the regular classes with aide is more different from the individuals' one by having two peaks in the plot. This suggests that there are class differences, which may be caused by the teacher or aide's proficiency of instruction. It could also be due to the fact that schools with high promotion rates are frequented by high-achieving students, so high-achieving students cluster, and vice versa. </p>
+
+
+
+### Data distribution at class level
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(knitr)
+library(kableExtra)
+```
+
+
+```{r echo=FALSE}
+## summary numerical data
+
+Min_c = round(apply(class_summary[c('math_avg','g1classsize','g1tyears','freelunch_ratio','gender_ratio',
+                                    'white_ratio')], 2, min, na.rm = TRUE), 2)
+Q1_c = round(apply(class_summary[c('math_avg','g1classsize','g1tyears','freelunch_ratio','gender_ratio',
+                                    'white_ratio')], 2, quantile, probs = 0.25, na.rm = TRUE), 2)
+Median_c = round(apply(class_summary[c('math_avg','g1classsize','g1tyears','freelunch_ratio','gender_ratio',
+                                    'white_ratio')], 2, mean, na.rm = TRUE), 2)
+Mean_c = round(apply(class_summary[c('math_avg','g1classsize','g1tyears','freelunch_ratio','gender_ratio',
+                                    'white_ratio')], 2, median, na.rm = TRUE), 2)
+Q3_c = round(apply(class_summary[c('math_avg','g1classsize','g1tyears','freelunch_ratio','gender_ratio',
+                                    'white_ratio')], 2, quantile, probs = 0.75, na.rm = TRUE), 2)
+Max_c = round(apply(class_summary[c('math_avg','g1classsize','g1tyears','freelunch_ratio','gender_ratio',
+                                    'white_ratio')], 2, max, na.rm = TRUE), 2)
+NAs_c = round(colSums(is.na(class_summary[c('math_avg','g1classsize','g1tyears','freelunch_ratio','gender_ratio',
+                                    'white_ratio')])),0)
+  
+class_summary_table = rbind(Min_c,Q1_c,Median_c,Mean_c,Q3_c,Max_c,NAs_c)
+
+class_summary_df = data.frame(class_summary_table, stringsAsFactors = FALSE)
+colnames(class_summary_df) <- c("Class Mean Math Scores", 'Class Size',"Teachers' Years of Total Teaching", 'Freelunch Ratio','Gender Ratio','Race Ratio')  
+rownames(class_summary_df) <- c('Min', '1st Qu.', 'Median', 'Mean', '3rd Qu.', 'Max', 'NAs')  
+
+class_summary_df
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=6, fig.width=15, warning=FALSE}
+p1_c = ggplot(class_summary, aes(x = math_avg)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = median(class_summary$math_avg), linetype = "dashed", color = "blue", aes(color = "Median")) +
+  geom_vline(xintercept = mean(class_summary$math_avg), linetype = "dashed", color = "red", aes(color = "Mean")) +
+  labs(title = "Class Mean Math Score Density Plot",
+       x = "Math Score",
+       y = "Density") +
+  theme_minimal()
+
+p2_c = ggplot(class_summary, aes(x = g1classsize)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = median(class_summary$g1classsize), linetype = "dashed", color = "blue", aes(color = "Median")) +
+  geom_vline(xintercept = mean(class_summary$g1classsize), linetype = "dashed", color = "red", aes(color = "Mean")) +
+  labs(title = "Class Size Density Plot",
+       x = "Class Size",
+       y = "Density") +
+  theme_minimal()
+
+p3_c = ggplot(class_summary, aes(x = g1tyears)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = median(class_summary$g1tyears, na.rm = TRUE), linetype = "dashed", color = "blue", aes(color = "Median")) +
+  geom_vline(xintercept = mean(class_summary$g1tyears, na.rm = TRUE), linetype = "dashed", color = "red", aes(color = "Mean")) +
+  labs(title = "Teacher's Total Teaching Years Density Plot",
+       x = "Teacher's Total Teaching Years",
+       y = "Density") +
+  theme_minimal()
+
+p4_c = ggplot(class_summary, aes(x = freelunch_ratio)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = median(class_summary$freelunch_ratio, na.rm = TRUE), linetype = "dashed", color = "blue", aes(color = "Median")) +
+  geom_vline(xintercept = mean(class_summary$freelunch_ratio, na.rm = TRUE), linetype = "dashed", color = "red", aes(color = "Mean")) +
+  labs(title = "Free Lunch Ratio Density Plot",
+       x = "Free Lunch Ratio",
+       y = "Density") +
+  theme_minimal()+
+  xlim(c(0,1))
+
+p5_c = ggplot(class_summary, aes(x = gender_ratio)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = median(class_summary$gender_ratio), linetype = "dashed", color = "blue", aes(color = "Median")) +
+  geom_vline(xintercept = mean(class_summary$gender_ratio), linetype = "dashed", color = "red", aes(color = "Mean")) +
+  labs(title = "Gender Ratio Density Plot",
+       x = "Gender Ratio",
+       y = "Density") +
+  theme_minimal()+
+  xlim(c(0,1))
+
+p6_c = ggplot(class_summary, aes(x = white_ratio)) +
+  geom_histogram(binwidth = 0.05, fill = "lightgrey", color = "black") +
+  labs(x = "Race Ratio", y = "Frequency", title = "Race Ratio Hist Plot")+
+  theme_minimal()
+
+cowplot::plot_grid(p1_c,p2_c,p3_c,p4_c,p5_c,p6_c,ncol = 3)
+```
+
+```{r echo=FALSE}
+## Find peaks
+library(pracma)
+
+# math_avg
+class_math_density = density(class_summary$math_avg)
+class_math_peaks = findpeaks(class_math_density$y)
+class_math_peak = class_math_density$x[class_math_peaks[2]]
+
+# class_size
+class_size_density = density(class_summary$g1classsize)
+class_size_peaks = findpeaks(class_size_density$y)
+class_size_peak_1 = class_size_density$x[class_size_peaks[1,2]]
+class_size_peak_2 = class_size_density$x[class_size_peaks[2,2]]
+
+# math_avg
+tyears_density = density(class_summary$g1tyears, na.rm = TRUE)
+tyears_peaks = findpeaks(tyears_density$y)
+tyears_peak = tyears_density$x[tyears_peaks[2]]
+
+# class_freelunch_rate
+class_freelunch_density = density(class_summary$freelunch_ratio, na.rm = TRUE)
+class_freelunch_peaks = findpeaks(class_freelunch_density$y)
+class_freelunch_peak_1 = class_freelunch_density$x[class_freelunch_peaks[1,2]]
+class_freelunch_peak_2 = class_freelunch_density$x[class_freelunch_peaks[2,2]]
+
+# race
+class_race_density = density(class_summary$'white_ratio')
+class_race_peaks = findpeaks(class_race_density$y)
+class_race_peak = class_race_density$x[class_race_peaks[1,2]]
+class_race_peak = class_race_density$x[class_race_peaks[2,2]]
+```
+
+
+<p align="justify">The median (531.50) and mean (532.38) of the class average math scores are slightly higher than the median (529.00) and mean (530.53) of the individual math scores, and the density peak (532.84) is around the median and mean too. Class size peaks (16, 22) within the range of the two class types (small, regular), but it can be seen that outside of the range of class sizes of the two class types (13-17, 22-25) there are quite a few classes. 75% of the teachers have less than 18 years of total teaching experience, and one teacher doesn't have total teaching experience data. While roughly half of the overall student population receives free lunch, the distribution of class free lunch rates peaks at 0.40 and 0.96.  This suggests that students with free lunch are clustered in some classes and that the free lunch rate may be a reflection of class differences. Since the whether having free lunch reflects to some extent the economic level of students, this difference may be due to the fact that students generally attend school in their neighborhoods, and families within the same neighborhood are of similar economic level, so classes in different neighborhoods may have differences in free lunch rates. The mean class gender ratio is similar to the overall student gender ratio, almost 1:1. The hist plot for the proportion of whites in a class has the greatest frequency at 0 and 1, which means there may be white and black school districts within the city. </p>
+
+
+
+
+## Caveats in data
+
+<p align="justify">In the initial report, we defaulted to the experimental design being followed exactly, and each school had at least one of each of the three types of classes, with small class sizes ranging from 13-17 and regular class sizes ranging from 22-25. However, due to student transfers and school operations, both of these designs were not implemented. </p>
+
+<p>
+
+</p>
+
+### Missing data in class level
+
+```{r echo=FALSE, fig.height=4, fig.width=12}
+school_classtype_table = table(class_summary$g1schid,factor(class_summary$g1classtype, levels = c(1, 2, 3),
+                                   labels = c('Small', 'Regular','Regular+Aide')))
+
+ggplot(as.data.frame(school_classtype_table),
+        aes(Var1, Var2, fill = Freq)) +
+         geom_tile() +
+         scale_fill_gradient(low = "white", high = "black") +
+         labs(title = "Class Tpye Frequency of Each School", x = "Class Tpye",
+              y = "School ID", fill = "Counts") +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 90, hjust = 0.5)) +
+        theme(axis.text.y = element_text(angle = 90, hjust = 0.5))
+```
+
+<p align="justify">The class type frequency heat plot shows that the schools with ID 244728, 244736, 244796 and 244839 don't have regular class with aide. As the missing may cause bias, we should impute this missing class data.<p>
+
+```{r echo=FALSE}
+missing_type_school = school_classtype_table[school_classtype_table[,3]==0,]
+school_names = rownames(missing_type_school)
+
+missing_type_school_data = class_summary[class_summary$g1schid %in% rownames(missing_type_school),]
+subset(missing_type_school_data, select = c('g1schid','math_avg','g1surban','freelunch_ratio','white_ratio','gender_ratio','g1trace','g1thighdegree','g1tcareer','g1tyears'))
+```
+
+<p align="justify">From the class data of this four school, we can find that the same school has the same school urbanicity, similar free lunch ratio and white ratio, while other variables have little to do with the school. So we impute the missing classes with same school urbanicity of their school, the median of free lunch ratio and white ratio of their school, the median class type of regular-with-aide classes, and the median of other variables among all the classes. <p>
+
+```{r echo=FALSE}
+school_related = data.frame()
+for (schid in school_names) {
+  school_related = rbind(school_related,sapply(missing_type_school_data[missing_type_school_data$g1schid==schid,][,c('g1surban','freelunch_ratio','white_ratio')],median))
+}
+colnames(school_related) = c('g1surban', 'freelunch_ratio', 'white_ratio')
+
+max_tchid = max(class_summary$g1tchid)
+
+median_values = sapply(class_summary, median, na.rm = TRUE)
+
+new_rows = class_summary[c(1:length(school_names)),]
+
+medsize_type3 = median(class_summary[class_summary$g1classtype==3,]$g1classsize, na.rm = TRUE)
+
+for (col in colnames(class_summary)) {
+  if (col=='g1tchid') {
+    new_rows[[col]] = c(1:length(school_names)) + max_tchid
+  }
+  else if (col=='g1schid'){
+    new_rows[[col]] = school_names
+  }
+  else if (col=='g1classtype'){
+    new_rows[[col]] = rep(3, length(school_names))
+  }
+  else if (col=='g1classsize'){
+    new_rows[[col]] = rep(medsize_type3, length(school_names))
+  }
+  else if (col %in% c('g1surban','freelunch_ratio','white_ratio')) {
+    new_rows[[col]] = school_related[[col]]
+  }
+  else {
+    new_rows[[col]] = median_values[col]
+  }
+}
+
+# new_rows
+
+imputed_class_summary = rbind(class_summary, new_rows)
+```
+
+<p align="justify"></p>
+
+```{r echo=FALSE, fig.height=4, fig.width=12, include=FALSE}
+imputed_school_classtype_table = table(imputed_class_summary$g1schid, factor(imputed_class_summary$g1classtype, levels = c(1, 2, 3), labels =c('Small','Regular','Regular+Aide')))
+
+ggplot(as.data.frame(imputed_school_classtype_table),
+        aes(Var1, Var2, fill = Freq)) +
+         geom_tile() +
+         scale_fill_gradient(low = "white", high = "black") +
+         labs(title = "Class Tpye Frequency of Each School", x = "Class Tpye",
+              y = "School ID", fill = "Counts") +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 90, hjust = 0.5)) +
+        theme(axis.text.y = element_text(angle = 90, hjust = 0.5))
+```
+
+
+### Non-compliance
+
+```{r include=FALSE, echo=FALSE}
+out_of_range = imputed_class_summary %>%
+   filter((g1classtype == 1 & !(g1classsize >= 13 & g1classsize <= 17)) |
+          ((g1classtype == 2 | g1classtype == 3) & !(g1classsize >= 22 & g1classsize <= 25)))
+table(out_of_range$g1classtype)
+```
+
+<p align="justify">Also, when we check the number of students in all the classes, we find that the class type is not labeled correctly. There are 12 classes labeled "Small", 46 classes labeled "Regular" and 45 classes label "Regular" that are out of range.</p>
+
+<p>
+
+</p>
+
+```{r echo=FALSE, include=FALSE}
+table(class_summary$g1classtype,class_summary$g1classsize)
+```
+
+```{r echo=FALSE, fig.height=4, fig.width=12}
+size_type_table = table(imputed_class_summary$g1classsize,
+                                     factor(imputed_class_summary$g1classtype, levels = c(1, 2, 3),
+                                            labels = c('Small', 'Regular', 'Regular+Aide')))
+
+ggplot(as.data.frame(size_type_table),
+       aes(Var1, Var2, fill = Freq)) +
+        geom_tile() +
+        geom_text(data = subset(as.data.frame(size_type_table), Freq != 0),
+                  aes(label = Freq, fontface = "bold"), color = "darkorange") +
+        geom_vline(xintercept = c(1.5, 6.5, 10.5, 14.5), color = "darkred", linetype = "solid") +
+        geom_vline(xintercept = c(10.5, 14.5), color = "darkblue", linetype = "solid") +
+        geom_text(data = NULL, aes(x = 4, y = 3, label = "Small Class Size"),
+                  color = "darkred") + 
+        geom_text(data = NULL, aes(x = 12.5, y = 1, label = "Regular Class Size"),
+                  color = "darkblue") +  
+        scale_fill_gradient(low = "white", high = "black") +
+         labs(title = "Class Frequency - Class Size vs. Class Type", x = "Class Type", y = "Class Size",
+              fill = "Counts") +
+        theme_minimal()
+```
+
+<p align="justify">The heat plot above shows that most small classes are in the range of 13-17, and most of the regular size class are in the range of 21-24. However, since some of the classes that exceeded the class size of their type were the only class of that type in that school, removing these out-of-range classes or altering their type to which they should belong would leave some schools with missing classes of a particular type, which would not be consistent with the experimental design. Therefore we can consider the actual class size as another variable into the model.</p>
+
+
+
+## Multivariate description
+
+### Class mean math vs class type and class size
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=12, message=FALSE, warning=FALSE}
+p1_mul = ggplot(imputed_class_summary, aes(x = as.factor(g1classtype), y = math_avg)) +
+  geom_violin(trim=FALSE,width = 0.5, fill = "skyblue", color = "skyblue") +
+  geom_boxplot(width=0.1,position=position_dodge(0.9))+
+  labs(x = "Class Type", y = "Mean Math Score", title = "Violin plot of Class Mean Math Score by Class Type") +
+  scale_x_discrete(labels = c("Small","Regular with aide","Regular")) +
+  theme_minimal()
+
+p2_mul = ggplot(imputed_class_summary, aes(x = as.factor(g1classsize), y = math_avg)) +
+  geom_boxplot()+
+  labs(x = "Class Size", y = "Mean Math Score", title = "Violin plot of Class Mean Math Score by Class Size") +
+  theme_minimal()
+
+cowplot::plot_grid(p1_mul,p2_mul,ncol = 2)
+```
+
+<p align="justify">This violin plot shows that there are large difference in classes' mean math score between class types and between class size. Small class has the maximum average math score, while regular class has the least. There is one outlier in the small class, two in the regular class, and none in the regular with aide. The distribution of class average math scores for the small and regular classes approximates a normal distribution, but the distribution for the regular with aide has two peaks. The box plot of class size shows that the classes with 14 students have the highest median class average math score, the one have 28 students have the lowest median. </p>
+
+### Class mean math vs school ID
+
+```{r echo=FALSE, fig.height=4, fig.width=12, message=FALSE, warning=FALSE}
+school_summary_stats = imputed_class_summary %>%
+  group_by(g1schid) %>%
+  summarize(min = min(math_avg),
+            Q1 = quantile(math_avg,0.25,na.rm=TRUE),
+            mean = mean(math_avg),
+            median = median(math_avg),
+            Q3 = quantile(math_avg,0.25,na.rm=TRUE),
+            max = max(math_avg))
+# school_summary_stats
+
+ggplot(imputed_class_summary, aes(x = as.factor(g1schid), y = math_avg)) +
+  geom_boxplot() +
+  labs(x = "School ID", y = "Mean Math Score", title = "Boxplot of Class Mean Math Score by School") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  
+```
+
+<p align="justify">This boxplot shows that there are large difference in classes' mean math score between schools. Meanwhile some schools have outliers. Take school id 244776 of which maximum values is the outlier as an example to check the math score.</p>
+
+```{r echo=FALSE, fig.height=4, fig.width=12, message=FALSE, warning=FALSE}
+# imputed_class_summary[imputed_class_summary$g1schid==244776,]
+
+ggplot(imputed_grade1[imputed_grade1$g1schid==244776,],
+       aes(x = as.factor(g1tchid), y = g1tmathss)) +
+  geom_violin(trim=FALSE,width = 0.5, fill = "skyblue", color = "skyblue") +
+  geom_boxplot(width=0.1,position=position_dodge(0.9))+
+  labs(x = "Classtype and School ID", y = "Mean Math Score", title = "Violinplot of Math Score at School ID 244776") +
+  scale_x_discrete(labels = c("Small - 1\n24477609", "Small - 2\n24477610", 
+                              "Regular with aide - 1\n24477611", "Regular with aide - 2\n24477612",
+                              "Regular - 1\n24477613", "Regular - 2\n24477614")) +
+  theme_minimal()
+```
+
+<p align="justify">The violin plot shows that each class has a reasonable distribution of scores with few outliers. Small class with teacher id 24477609 has a much higher mean math score than the other classes. By comparing it with the other small class with teacher id 24477610 we find that teacher id 24477609 has a higher ladder level (4 vs 3) and more total teaching years (8 vs 2), which means she is more experienced. So this outlier is reasonable.</p>
+
+### Class mean math vs school urbanicity
+
+```{r echo=FALSE, fig.height=4, fig.width=12, message=FALSE, warning=FALSE}
+p_math_urban = ggplot(imputed_class_summary, aes(x = as.factor(g1surban), y = math_avg)) +
+  geom_violin(trim=FALSE,width = 0.5, fill = "skyblue", color = "skyblue") +
+  geom_boxplot(width=0.1,position=position_dodge(0.9))+
+  labs(x = "Class Type", y = "Mean Math Score", title = "Violin plot of Class Mean Math Score by School Urbanicity") +
+  scale_x_discrete(labels = c('Inner city','Suburban','Rural','Urban')) +
+  theme_minimal()
+
+p_math_career = ggplot(imputed_class_summary, aes(x = as.factor(g1tcareer), y = math_avg)) +
+  geom_violin(trim=FALSE,width = 1, fill = "skyblue", color = "skyblue") +
+  geom_boxplot(width=0.1,position=position_dodge(0.9))+
+  labs(x = "Teachers' Career Level", y = "Mean Math Score", title = "Violin plot of Class Mean Math Score by Teachers' Career Level") +
+  scale_x_discrete(labels = c('No ladder','Apprentice','Probation','Level 1','Level 2','Level 3','Pending')) +
+  theme_minimal()
+
+cowplot::plot_grid(p_math_urban,p_math_career,ncol = 2)
+```
+<p align="justify">The overall performance of inner city's classes is lower than the performance of the other three locations. Classes with teachers at Ladder level 3 performed better overall than classes with teachers at other levels.</p>
+
+```{r echo=FALSE, fig.height=4, fig.width=12, message=FALSE, warning=FALSE}
+p1_freelunch = ggplot(imputed_class_summary, aes(x = freelunch_ratio, y = math_avg, color = as.factor(g1classtype))) +
+  geom_point(shape = as.factor(imputed_class_summary$g1classtype)) +
+  geom_smooth(method = "lm", se = FALSE, size = 1) +
+  labs(x = "Free Lunch Ratio", y = "Math Average", color = "Class Type") +
+  ggtitle("Math Average vs.\nFree Lunch Ratio by Class Type")+
+  theme_minimal()
+
+p2_white = ggplot(imputed_class_summary, aes(x = white_ratio, y = math_avg, color = as.factor(g1classtype))) +
+  geom_point(shape = as.factor(imputed_class_summary$g1classtype)) +
+  geom_smooth(method = "lm", se = FALSE, size = 1) +
+  labs(x = "White Student Ratio", y = "Math Average", color = "Class Type") +
+  ggtitle("Math Average vs.\nWhite Student Ratio by Class Type")+
+  theme_minimal()
+
+p3_white_free = ggplot(imputed_class_summary, aes(x = white_ratio, y = freelunch_ratio, color = as.factor(g1classtype))) +
+  geom_point(shape = as.factor(imputed_class_summary$g1classtype)) +
+  geom_smooth(method = "lm", se = FALSE, size = 1) +
+  labs(x = "White Student Ratio", y = "Free Lunch Ratio", color = "Class Type") +
+  ggtitle("Free Lunch Ratio vs.\nWhite Student Ratio by Class Type")+
+  theme_minimal()
+
+ cowplot::plot_grid(p1_freelunch,p2_white,p3_white_free,ncol = 3)
+```
+
+<p align="justify">The scatter plot and fitted straight line of free lunch ratio and class average math scores show that the larger the free lunch ratio, the smaller the class average math score. Students from better-off families tend to get better grades. This may be related to the importance and monetary investment that families place on education. The scatter plot and fitted line of white student ratio and class average math scores show that the larger the white student ratio, the better the class average math scores. The scatter plot and fitted line for white student ratio and free lunch ratio show that the larger the white student ratio, the smaller the free lunch ratio. White students' families are overall better off financially than non-whites. </p>
+
+# Inferential analysis
+
+## Two-Way ANOVA Model
+
+**Mathematical Expression**
+
+$$
+Y_{ijk} = \mu_{..} + \alpha_{i} + \beta_{j} + \epsilon_{aijk}
+$$
+
+-   The index $i$ represents the class type: small ($i=1$), regular ($i=2$), regular with aide ($i=3$), and the index $j$ represents the school id, $j=1,…,76$.
+
+-   $Y_{ijk}$ is the mean math score of the teacher for the $i$ class type, $j$ school, and $k$ observation.
+
+-   $\mu_{..}$ is the overall population mean of the mean math score, $\mu_{..}=\sum_{i=1}^{3}\sum_{j=1}^{76}\mu_{ij}/(3*76)$, where $\mu_{ij}$ is the cell mean.
+
+-   $\alpha_{i}$ is the effect associated with the $i$ class type, measuring the difference between the overall mean and the mean for class type, $\alpha_i = \mu_{i.}-\mu_{..}$, where $\mu_{i.}$ is the mean for class type, $\mu_{i.}=\sum_{j=1}^{76}\mu_{ij}/76$.
+
+-   $\beta_{j}$ is the effect associated with the $j$ school, measuring the difference between the overall mean and the mean for school, $\beta_i = \mu_{.j}-\mu_{..}$, where $\mu_{.j}$ is the mean for school, $\mu_{.j}=\sum_{i=1}^{3}\mu_{ij}/3$.
+
+-   $\epsilon_{ijk}$ is the random error term apart from the fixed effects.​
+
+-   As three class types have different amounts of observations, this is a unbalanced modle.
+
+
+**Assumptions of the model**
+
+1.  The mean math score $Y_{ijk}$ are independent from class to class and school to school.
+2.  The residuals $\epsilon_{ijk}$ are i.i.d. $N(0,\sigma^2)$.
+
+**Constraints on the parameters**
+
+There are natural constraints on these effects:
+
+$$
+\sum_{i=1}^{3}\alpha_i=\sum_{j=1}^{76}\beta_j=0
+$$
+
+## Justify the Choice of Model
+
+### Main Effects Plots
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(gplots)
+```
+
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=12, message=FALSE, warning=FALSE}
+par(mfrow = c(1,2))
+plotmeans(math_avg ~ g1classtype,data=imputed_class_summary,
+          xlab="Class Types",ylab="Mean Math score",main="Main  Effect -  Class Type",
+          cex.lab=1.1,cex.main=1.3)
+
+plotmeans(math_avg ~ g1schid,data=imputed_class_summary,
+          xlab="School ID",ylab="Mean Math score",main="Main  Effect - School ID",n.label=FALSE,
+          cex.lab=1.1,cex.main=1.3)
+```
+
+<p align="justify">The response means are not the same across all class types and all school ids, so there are main effects present in both class types and school ids, we should consider these two variables.</p>
+
+### Interaction plot
+
+```{r echo=FALSE, fig.height=6, fig.width=12, message=FALSE, warning=FALSE}
+par(mfrow = c(1,2))
+interaction.plot(imputed_class_summary$g1classtype, imputed_class_summary$g1schid,
+                 imputed_class_summary$math_avg, ylab="Mean Math Score",xlab='Class Types',
+                 main = 'Interaction Plot between Class Type and School ID', legend = FALSE)
+interaction.plot(imputed_class_summary$g1classtype, imputed_class_summary$g1classsize,
+                 imputed_class_summary$math_avg, ylab="Mean Math Score",xlab='Class Types',
+                 main = 'Interaction Plot between Class Type and Class Size', legend = FALSE)
+```
+
+<p align="justify">There is some interaction between class type and school id and class type and class size due to the intersection of lines in the interaction plot. But whether we should use interaction terms still need some test in the model fitting part.</p>
+
+
+
+## Fit the Model
+
+<p align="justify">Here we use the type II sums of squares in the ANOVA table of the two-way ANOVA model, which calculates the sole contribution of each variables.</p>
+
+For class type:
+$H_0: for\ all\ i,\ \alpha_i=0,H_a: for\ some\ i,\ \alpha_i\neq0$
+
+For school IDs:
+$H_0: for\ all\ j,\ \beta_j=0,H_a: for\ some\ j,\ \beta_j\neq0$
+
+Let the significance level be 0.05.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(car)
+twoway_model=lm(math_avg~as.factor(g1classtype)+g1schid,data=imputed_class_summary);
+twoway.fit = Anova(twoway_model,type=2)
+
+library(broom)
+
+data.frame(tidy(twoway.fit))
+```
+As p-value\<0.05 for both variables, they reject $H_0$, which means
+significant evidence of class types and school IDs, we should consider
+both of them in the model.
+
+### Justify interaction terms
+
+Now test whether we should use the interaction factor.
+
+Let the full model be
+$Y_{ijk} = \mu_{..} + \alpha_{i} + \beta_{j} + (\alpha\beta)_{ij} + \epsilon_{ijk}$,
+where $(\alpha\beta)_{ij}=\mu_{ij}-\mu_{i.}-\mu_{.j}+\mu_{..}$.
+
+In the anova table, the test of interaction:
+
+$H_0:for\ all\ i\ and\ j,\ (\alpha\beta)_{ij}=0,\ H_a:for\ some\ i\ and\ j,\ (\alpha\beta)_{ij}\neq 0$.
+
+Let the significance level be 0.05.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+full_model=lm(math_avg~as.factor(g1classtype)+g1schid+as.factor(g1classtype)*g1schid,
+              data=imputed_class_summary);
+compare_model = anova(twoway_model,full_model)
+data.frame(tidy(compare_model)[c(1,7)])
+```
+<p align="justify">As p-value\>0.05 in the anova table, it fails to reject the null hypothesis, which means no significant evidence of the interaction, we can ignore the interaction in the model. Therefore, we choose the two-way anova model without interaction. We have additional assumption that the class types and school ids are independent factors, which have no effects on each other.</p>
+
+### Coeffecients
+
+```{r echo=FALSE}
+data.frame(twoway_model$coefficients[1:3])
+```
+
+So the fitted model will be:
+
+$$
+Y_{ijk} = 504.14 + \alpha_{i} + \beta_{j}
+$$
+
+where $\alpha_1=0,\ \alpha_2=-12.82,\ \alpha_3=-9.68,\ \beta_1=0$, other
+$\beta_{j}$ can be found in the following table.
+
+```{r echo=FALSE}
+data.frame(twoway_model$coefficients[4:78])
+```
+
+## Tukey's range test
+
+<p align="justify">Tukey's range test is a multiple comparison method. After ANOVA shows significant differences between groups, we use Tukey's range test to determine which specific groups have significant differences. Let the significance level be 0.05.</p>
+
+```{r echo=FALSE}
+# Fit the chosen model:
+library(stats)
+sig.level=0.05;
+Tukey_anova.fit<-aov(math_avg~as.factor(g1classtype),data=imputed_class_summary)
+anova.fit<-aov(math_avg~as.factor(g1classtype)+g1schid,data=imputed_class_summary)
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=3, fig.width = 6}
+# Find the best combination
+par(mfrow = c(1, 1))
+Tukey_result=TukeyHSD(Tukey_anova.fit,conf.level = 1-sig.level)
+plot(Tukey_result, las=0 , col="brown")
+```
+
+<p align="justify">From the plot and table, we can find that small class type has the highest mean math score among the three class types, regular with aide the second, regular the lowest.</p>
+
+<p align="justify">Therefore both model coefficients and Tukey's range test show that math score has difference level in different class types, and small class trends to have the highest math score. This result match the descriptive analysis. This is consistent with the violin plot of class type with respect to math score, and when we plotted the relationship of the other variables (free lunch and white ratio) with math scores in sub class type, small class had the largest intercept and consistently larger values than the other two classes. Also, after checking mean class average of students' presenting days, we find that small class has the highest number of days of attendance(small:150,regular:148,regular with aide:149). Better student achievement and performance may due to smaller class sizes where teachers are more invested in each student</p>
+
+```{r echo=FALSE, include=FALSE}
+pre_summary = imputed_grade1 %>%
+   group_by(g1tchid) %>%
+   summarise(
+     presenting = mean(g1present, na.rm = TRUE),
+     g1classtype = first(g1classtype),
+   )
+mean(pre_summary$presenting[pre_summary$g1classtype==1], na.rm = TRUE)
+mean(pre_summary$presenting[pre_summary$g1classtype==2], na.rm = TRUE)
+mean(pre_summary$presenting[pre_summary$g1classtype==3], na.rm = TRUE)
+table(pre_summary$g1classtype,pre_summary$presenting)
+```
+
+
+
+
+# Sensitivity analysis
+
+## Model Diagnose
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=12, message=FALSE, warning=FALSE}
+# Diagnostic plots
+par(mfrow=c(1,2))
+plot(anova.fit,cex.lab=1.2,which=1:2)
+```
+
+<p align="justify">From the plot of the residuals versus the fitted values, we can see that the residuals are relatively evenly distributed between the fitted values, which indicates that the assumption of constant variance of the residuals is valid.  From the normal Q-Q plot, we can check that the residuals do not deviate significantly from the theoretical quantile. It has some heavy tails, but is almost linearly distributed, indicating no serious bias.  For additional hypotheses, class type and school were not correlated in the above analysis. Based on the results of the residual vs. fitted value plots and normal Q-Q plots, the additional assumption of linearity holds.</p>
+
+<p align="justify">We can still do the boxcox to normalize the distribution.</p>
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, message=FALSE, warning=FALSE}
+par(mfrow = c(1,1))
+library(MASS)
+bc_results = boxcox(anova.fit)
+```
+
+<p align="justify">From the box cox, we can see the best transformation is $\lambda=-1.84$. So we can transform the mean math score with $\lambda$. </p>
+
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=12, message=FALSE, warning=FALSE}
+lambda = bc_results$x[which.max(bc_results$y)]
+transformed_data = (imputed_class_summary[,c('math_avg')]^lambda - 1) / lambda
+par(mfrow=c(1,2))
+hist(transformed_data$math_avg)
+qqnorm(transformed_data$math_avg)
+```
+
+<p align="justify">After transformation, the mean math score is nearly a normal distribution.</p>
+
+
+## Test more variables for heterogeneity
+
+```{r echo=FALSE, fig.align='center', fig.height=6, fig.width=12, message=FALSE, warning=FALSE}
+par(mfrow = c(2,2))
+plot(imputed_class_summary$g1classsize,imputed_class_summary$math_avg,
+          xlab="Class Size",ylab="Mean Math score",main="Class Size vs Mean Math score",
+          cex.lab=1.1,cex.main=1.3)
+plotmeans(math_avg ~ g1surban,data=imputed_class_summary,
+          xlab="Class Types",ylab="Mean Math score",main="Main  Effect - School Urbanicity",
+          cex.lab=1.1,cex.main=1.3)
+plotmeans(math_avg ~ g1thighdegree,data=imputed_class_summary,
+          xlab="Teachers' Highest Degree",ylab="Mean Math score",
+          main="Main  Effect -  Teacher's Highest Degree",
+          cex.lab=1.1,cex.main=1.3)
+plotmeans(math_avg ~ g1tcareer,data=imputed_class_summary,
+          xlab="Teachers' Career",ylab="Mean Math score",main="Main  Effect - Teacher's Career",
+          cex.lab=1.1,cex.main=1.3)
+```
+
+<p align="justify">School urbanicity, teacher's highest degree and teacher's career all have several categories that have similar mean, so we can't say there is a main effect present in these variables. The mean class math score trends to decrease by the class size increasing.  To do the sensitive test of adding new variables for heterogeneity, we separately add class size, free lunch ratio, white students ratio, teacher career level and teachers' teaching years in to the model. Then we test them with anova to see if the adding variables make significant improvement in the new model. Set the significant level to 0.05.</p>
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(zoo)
+imputed_class_summary$freelunch_ratio = na.aggregate(imputed_class_summary$freelunch_ratio, FUN = median, na.rm = TRUE)
+imputed_class_summary$g1tcareer = na.aggregate(imputed_class_summary$g1tcareer, FUN = median, na.rm = TRUE)
+imputed_class_summary$g1tyears = na.aggregate(imputed_class_summary$g1tyears, FUN = median, na.rm = TRUE)
+
+model1 = lm(math_avg ~ as.factor(g1classtype) + as.factor(g1schid), 
+             data = imputed_class_summary)
+model2 = lm(math_avg ~ as.factor(g1classtype) + as.factor(g1schid) + g1classsize, 
+             data = imputed_class_summary)
+model3 = lm(math_avg ~ as.factor(g1classtype) + as.factor(g1schid) + freelunch_ratio,
+             data = imputed_class_summary)
+model4 = lm(math_avg ~ as.factor(g1classtype) + as.factor(g1schid) + white_ratio,
+             data = imputed_class_summary)
+model5 = lm(math_avg ~ as.factor(g1classtype) + as.factor(g1schid) + as.factor(g1tcareer),
+             data = imputed_class_summary)
+model6 = lm(math_avg ~ as.factor(g1classtype) + as.factor(g1schid) + g1tyears,
+             data = imputed_class_summary)
+
+rbind(cbind(data.frame(tidy(anova(model1,model2)))[2,c(1,7)],data.frame(t(coef(model2)[1:3]))),
+      cbind(data.frame(tidy(anova(model1,model3)))[2,c(1,7)],data.frame(t(coef(model3)[1:3]))),
+      cbind(data.frame(tidy(anova(model1,model4)))[2,c(1,7)],data.frame(t(coef(model4)[1:3]))),
+      cbind(data.frame(tidy(anova(model1,model5)))[2,c(1,7)],data.frame(t(coef(model5)[1:3]))),
+      cbind(data.frame(tidy(anova(model1,model6)))[2,c(1,7)],data.frame(t(coef(model6)[1:3]))))
+
+```
+
+<p align="justify">From the table above, we can see p-value are all above the significant level, so adding the variable is useless, not efficient and have more variance. Also, looking at the coefficients of class types, small class trends to have the highest mean math score among the three class types. As the result of our interest doesn't change, adding more variables is not decisive，we can drop them.</p>
+
+<p align="justify">This is probably due to the fact that class size information is largely contain in the class type and the school id has overwritten the information in other variables. Remembering the multivariate description part, we analysis all the classes in one school and find that their class free lunch ratio and white student ratio are similar. This may because the students are all come from the nearby community with similar financial situation and race. And school id may name by it location. So these variables are related to each other. </p>
+
+
+# Discussion
+
+In these study, we analyze the relationship between math score and class type. We find that small classes tends to have higher math score because teacher can have more attention on their students to make them attending school more frequently. Also, we find that the students in the same school seems to have the same finance situation and more likely to be the same race. People may choose school in their own community or will prefer classmates in same race. Moreover, we find that the missing values and non compliance do not effect our results. According to this study results, schools can have more small classes for regular class with aide to improve students score and performance. For the caveats of the current analysis, we haven't test insufficient covariates and infeasible assumptions yet.
+
+
+Here is my github repository: https://github.com/JieyingMa/STA207
+
+
+# Acknowledgement {.unnumbered}
+
+I have discussed this project with my classmates Hebi Wang, Fanling Liu, Feini Pek.
+
+
+# Reference {.unnumbered}
+
+<p align="justify">
+
+[1] Achilles, C. M. (2012). Class-size policy the STAR experiment and related class-size studies. NCPEA policy brief. volume 1, number 2. Distributed by ERIC Clearinghouse.
+
+[2] Achilles, C.M., Bain, H. P., Bellott, F., Boyd-Zaharias, J., Finn, J., Folger, J., Johnston, J., & Word, E. (2008, October 7). Tennessee's student teacher achievement ratio (STAR) project. Harvard Dataverse. <https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi%3A10.7910%2FDVN%2FSIWH9F>
+
+</p>
+
+<p>
+# Code Appendix {.unnumbered}
+
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
+
+
+# Session info {.unnumbered}
+
+```{r}
+sessionInfo()
+```
