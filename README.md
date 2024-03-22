@@ -1,3 +1,9 @@
+# ReadMe
+
+In this repository, you'll find an HTML file and an Rmd (R Markdown) file. The HTML document presents the finalized analysis, viewable in any web browser for convenience. The Rmd file contains the source code, including all statistical analyses and markdown notes. To use these files, open the Rmd in RStudio to modify or further analyze the data. For viewing the analysis, simply open the HTML file in a web browser. These resources are designed for those interested in the detailed statistical analysis and findings of our study. You can have a quick look of what we have done from the following summary.
+
+
+
 # Investigation on Grade 1 Math Scores of Different Class Types
 
 ## 1. Introduction
