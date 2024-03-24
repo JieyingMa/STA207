@@ -36,7 +36,7 @@ The "Sensitivity analysis" section evaluates the robustness of the statistical m
 ### Discussion
 Summarizes key insights from the analysis, emphasizing the benefits of smaller class sizes on student performance and the influence of school and teacher characteristics on educational outcomes.
 
-### Repository Structure
+## Repository Structure
 - 'STA207-final report.html': The final report of our analysis.
 - 'STA207-final report.rmd': The .rmd file of our code.
 
