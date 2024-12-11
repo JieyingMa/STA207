@@ -1,6 +1,6 @@
 # ReadMe
 
-In this repository, you'll find an HTML file and an Rmd (R Markdown) file. The HTML document presents the finalized analysis, viewable in any web browser for convenience. The Rmd file contains the source code, including all statistical analyses and markdown notes. To use these files, open the Rmd in RStudio to modify or further analyze the data. For viewing the analysis, simply open the HTML file in a web browser. These resources are designed for those interested in the detailed statistical analysis and findings of our study. You can have a quick look of what we have done from the following summary.
+In this repository, you'll find an HTML file and an Rmd (R Markdown) file. The HTML document presents the finalized analysis, viewable in any web browser for convenience. You can preview the report [here](https://rawcdn.githack.com/JieyingMa/STA207/5f16c54ebd3cc55de30e0469622793d38eb9d305/STA207-final%20report.html). The Rmd file contains the source code, including all statistical analyses and markdown notes. To use these files, open the Rmd in RStudio to modify or further analyze the data. For viewing the analysis, simply open the HTML file in a web browser. These resources are designed for those interested in the detailed statistical analysis and findings of our study. You can have a quick look of what we have done from the following summary.
 
 
 
